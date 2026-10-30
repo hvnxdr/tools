@@ -26,6 +26,7 @@ Available tools:
   mysql
   mysql-legacy
   postgres
+  redis
 ```
 
 ## Available tools
@@ -36,6 +37,8 @@ Available tools:
 | `mysql`       | mysql:8.4     | 3306 | root/password, mysql/password, db `app` |
 | `mysql-legacy`| mysql:8.0     | 3307 | root/password, mysql/password, db `app` |
 | `postgres`    | postgres:17   | 5432 | postgres/password, db `app`        |
+| `redis`       | redis:8.10-alpine | 6379 | password `password`, database `0` |
+| `rakazo`      | ghcr.io/elie222/rakazo/app:edge | 3100, 5173 (127.0.0.1) | web UI `http://127.0.0.1:5173`; secrets in `rakazo/.env` (git-ignored, generated) |
 
 ## Examples
 

@@ -1,0 +1,3 @@
+# Rakazo's .env holds generated high-entropy secrets - never commit it.
+# (Other tools keep low-stakes dev passwords inline in their compose files.)
+rakazo/.env
