@@ -25,17 +25,28 @@ find_compose_file() {
     return 1
 }
 
+# Check whether a tool name is already in a list
+contains() {
+    local needle="$1"
+    shift
+    local item
+    for item in "$@"; do
+        [ "$item" = "$needle" ] && return 0
+    done
+    return 1
+}
+
 usage() {
     local tools
     tools="$(discover_tools)"
     cat <<EOF
-Usage: tools <command> <tool>
+Usage: tools <command> <tool>...
 
 Commands:
-  start   <tool>   Start a tool
-  stop    <tool>   Stop a tool
-  reload  <tool>   Restart a tool
-  ls               List available tools
+  start   <tool>...   Start one or more tools
+  stop    <tool>...   Stop one or more tools
+  reload  <tool>...   Restart one or more tools
+  ls                  List available tools
 
 Available tools:
 EOF
@@ -44,8 +55,17 @@ EOF
     done
 }
 
+die() {
+    echo "error: $*" >&2
+    echo >&2
+    usage >&2
+    exit 1
+}
+
 ACTION="${1:-}"
-TOOL="${2:-}"
+if (( $# > 0 )); then
+    shift
+fi
 
 case "${ACTION}" in
     ls)
@@ -54,32 +74,56 @@ case "${ACTION}" in
         ;;
 esac
 
-if [[ -z "$TOOL" ]]; then
+if (( $# == 0 )); then
     usage
     exit 1
 fi
 
-COMPOSE_FILE="$(find_compose_file "$TOOL")" || {
-    echo "error: unknown tool '$TOOL'" >&2
-    echo >&2
-    usage >&2
-    exit 1
-}
+# Validate every name before touching any stack, and drop duplicates.
+NAMES=()
+for name in "$@"; do
+    if (( ${#NAMES[@]} > 0 )) && contains "$name" "${NAMES[@]}"; then
+        continue
+    fi
+
+    find_compose_file "$name" >/dev/null || die "unknown tool '$name'"
+
+    NAMES+=("$name")
+done
 
 case "$ACTION" in
     start)
-        docker compose -f "$COMPOSE_FILE" up -d
+        COMPOSE_SUBCMD=(up -d)
+        VERB=starting
         ;;
     stop)
-        docker compose -f "$COMPOSE_FILE" down
+        COMPOSE_SUBCMD=(down)
+        VERB=stopping
         ;;
     reload)
-        docker compose -f "$COMPOSE_FILE" restart
+        COMPOSE_SUBCMD=(restart)
+        VERB=reloading
         ;;
     *)
-        echo "error: unknown command '$ACTION'" >&2
-        echo >&2
-        usage >&2
-        exit 1
+        die "unknown command '$ACTION'"
         ;;
 esac
+
+SHOW_HEADERS=0
+if (( ${#NAMES[@]} > 1 )); then
+    SHOW_HEADERS=1
+fi
+
+for name in "${NAMES[@]}"; do
+    COMPOSE_FILE="$(find_compose_file "$name")"
+
+    if (( SHOW_HEADERS )); then
+        echo "==> $VERB $name"
+    fi
+
+    docker compose -f "$COMPOSE_FILE" "${COMPOSE_SUBCMD[@]}" || {
+        status=$?
+        echo "error: failed to $ACTION '$name'" >&2
+        exit "$status"
+    }
+done
